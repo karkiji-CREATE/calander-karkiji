@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Calendar Assistant</title>
+<style>
+body{background:#1a1a2e;color:#f0f0f0;font-family:Arial,sans-serif;padding:20px;}
+.header{font-size:2rem;text-align:center;margin-bottom:20px;}
+.date-display{text-align:center;font-size:1.8rem;margin:5px 0;}
+.button{padding:10px 20px;margin:5px;cursor:pointer;background:#162447;color:#e43f5a;border:none;border-radius:5px;}
+.button:hover{background:#1f4068;}
+.search-container{display:flex;justify-content:center;margin-top:20px;}
+input[type=text]{flex:1;padding:10px;font-size:1rem;border-radius:5px;border:none;}
+#mic-btn{margin-left:10px;padding:10px;background:#e43f5a;color:white;border:none;border-radius:5px;cursor:pointer;}
+.response{margin-top:20px;font-size:1.2rem;background:#0f3460;padding:10px;border-radius:5px;min-height:50px;}
+#calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:20px;}
+.calendar-day{background:#162447;padding:15px;text-align:center;border-radius:5px;cursor:pointer;}
+.festival{background:#e43f5a;color:white;}
+</style>
+</head>
+<body>
+
+<div class="header">🌟 AI Calendar Assistant</div>
+<div class="date-display" id="nepali-date">२०८३/०१/३१ BS</div>
+<div class="date-display" id="english-date">2026-04-12 AD</div>
+<div style="text-align:center;"><button class="button" id="calendar-btn">📅 Show Calendar</button></div>
+
+<div class="search-container">
+<input type="text" id="question-input" placeholder="Ask about festivals, events..." />
+<button id="mic-btn">🎤</button>
+</div>
+
+<div class="response" id="response-box">Responses will appear here...</div>
+<div id="calendar-grid"></div>
+
+<script>
+const festivalData=[
+{name:"Dashain",ad_date:"2026-09-29"},
+{name:"Tihar",ad_date:"2026-11-10"},
+{name:"Losar",ad_date:"2026-04-13"},
+{name:"Solar Eclipse",ad_date:"2026-08-02"}
+];
+
+// Calendar display
+const calendarGrid=document.getElementById("calendar-grid");
+document.getElementById("calendar-btn").addEventListener("click",()=>{
+calendarGrid.innerHTML="";
+for(let i=1;i<=30;i++){
+const day=document.createElement("div");
+day.classList.add("calendar-day");
+const dateStr=`2026-09-${i<10?'0'+i:i}`;
+day.textContent=i;
+festivalData.forEach(f=>{if(f.ad_date===dateStr){day.classList.add("festival");day.title=f.name;}});
+day.addEventListener("click",()=>{const f=festivalData.find(f=>f.ad_date===dateStr);if(f) askAI(`Tell me about ${f.name} festival in Nepali`,'ne-NP');});
+calendarGrid.appendChild(day);
+}});
+
+// AI call via serverless backend
+async function askAI(question,lang='ne-NP'){
+const responseBox=document.getElementById('response-box');
+responseBox.textContent='Thinking...';
+try{
+const res=await fetch("/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question,lang})});
+const data=await res.json();
+const answer=data.choices[0].message.content;
+responseBox.textContent=answer;
+const utterance=new SpeechSynthesisUtterance(answer);
+utterance.lang=lang;
+window.speechSynthesis.speak(utterance);
+}catch(e){responseBox.textContent="Error connecting to AI.";}
+}
+
+// Text input enter
+document.getElementById("question-input").addEventListener("keydown",e=>{if(e.key==="Enter"){const q=e.target.value;if(q) askAI(q,'ne-NP');}});
+
+// Voice input
+let recognition;
+if('webkitSpeechRecognition' in window){
+recognition=new webkitSpeechRecognition();
+recognition.continuous=false;
+recognition.interimResults=false;
+recognition.lang="ne-NP";
+recognition.onresult=e=>{const text=e.results[0][0].transcript;document.getElementById('question-input').value=text;askAI(text,'ne-NP');};
+}
+document.getElementById("mic-btn").addEventListener("click",()=>{recognition.start();});
+
+// Triple tap (mobile)
+let tapCount=0;
+document.body.addEventListener("touchend",()=>{tapCount++;setTimeout(()=>tapCount=0,1000);if(tapCount===3) recognition.start();});
+
+// Shift key (desktop)
+document.addEventListener("keydown",e=>{if(e.key==="Shift") recognition.start();});
+
+// Zoom
+document.addEventListener("wheel",e=>{if(e.ctrlKey){let zoom=document.body.style.zoom||1;zoom=parseFloat(zoom)+(e.deltaY<0?0.1:-0.1);document.body.style.zoom=Math.min(Math.max(zoom,0.5),3);e.preventDefault();}});
+
+// Disable right-click / F12
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&e.key==='I')) e.preventDefault();});
+</script>
+
+</body>
+</html>
